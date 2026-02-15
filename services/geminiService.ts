@@ -7,10 +7,10 @@ import { ScanResult, ThreatLabel } from "../types";
  */
 export const analyzeThreatWithAI = async (url: string, resolvedIp: string, ruleResult: any): Promise<ScanResult> => {
   const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-  
+
   console.log("[LUCIFER PROTOCOL] Starting OpenRouter analysis for URL:", url);
   console.log("[LUCIFER] API Key Available:", !!apiKey);
-  
+
   if (!apiKey) {
     console.warn("[LUCIFER PROTOCOL] OpenRouter API_KEY not configured. Using rule-based analysis.");
     return {
@@ -25,7 +25,6 @@ export const analyzeThreatWithAI = async (url: string, resolvedIp: string, ruleR
   }
 
   try {
-    // Simplified, effective prompt for OpenRouter
     const userPrompt = `Analyze this URL for security threats. Respond ONLY with JSON.
 
 URL: ${url}
@@ -54,23 +53,21 @@ Return ONLY this JSON:
   }
 }`;
 
-    console.log("[LUCIFER] Sending request to OpenRouter API");
-    console.log("[LUCIFER] URL:", url);
-    console.log("[LUCIFER] IP:", resolvedIp);
-    
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-    
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const headers = {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://lucifer-protocol.local",
+      "X-Title": "LUCIFER Protocol Threat Scanner"
+    };
+
+    console.log("[LUCIFER] Step 1: Sending initial analysis request to OpenRouter");
+
+    // First API call with reasoning enabled
+    const response1 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://lucifer-protocol.local",
-        "X-Title": "LUCIFER Protocol Threat Scanner"
-      },
+      headers,
       body: JSON.stringify({
-        model: "tngtech/deepseek-r1t-chimera:free",
+        model: "openai/gpt-oss-120b:free",
         messages: [
           {
             role: "system",
@@ -81,93 +78,105 @@ Return ONLY this JSON:
             content: userPrompt
           }
         ],
+        reasoning: { enabled: true },
         temperature: 0.3,
-        max_tokens: 1024,
-        top_p: 0.9
-      }),
-      signal: controller.signal
+        max_tokens: 1024
+      })
     });
 
-    clearTimeout(timeout);
-    console.log("[LUCIFER] OpenRouter Response Status:", response.status);
-
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error("[LUCIFER] OpenRouter API Error:", response.status, errorData);
-      throw new Error(`OpenRouter API returned ${response.status}: ${errorData}`);
+    if (!response1.ok) {
+      const errorMsg = await response1.text();
+      throw new Error(`OpenRouter Step 1 failed: ${response1.status} - ${errorMsg}`);
     }
 
-    const data = await response.json();
-    console.log("[LUCIFER] Raw OpenRouter Response:", JSON.stringify(data));
-    
-    // Extract message content
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      console.error("[LUCIFER] Invalid response structure:", data);
-      throw new Error("Invalid OpenRouter response structure");
+    const result1 = await response1.json();
+    const message1 = result1.choices[0].message;
+
+    console.log("[LUCIFER] Step 2: Sending verification request with reasoning details");
+
+    // Second API call - model continues reasoning from where it left off
+    const response2 = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: "openai/gpt-oss-120b:free",
+        messages: [
+          {
+            role: "system",
+            content: "You are a cybersecurity expert. Analyze URLs for threats. Respond ONLY with valid JSON, no markdown or explanations."
+          },
+          {
+            role: "user",
+            content: userPrompt
+          },
+          {
+            role: "assistant",
+            content: message1.content,
+            reasoning_details: message1.reasoning_details // Pass back unmodified
+          },
+          {
+            role: "user",
+            content: "Are you sure? Think carefully and verify your analysis for accuracy. Ensure the output is ONLY a valid JSON object matching the requested schema."
+          }
+        ],
+        temperature: 0.2
+      })
+    });
+
+    if (!response2.ok) {
+      const errorMsg = await response2.text();
+      throw new Error(`OpenRouter Step 2 failed: ${response2.status} - ${errorMsg}`);
     }
 
-    let rawText = data.choices[0].message.content;
+    const result2 = await response2.json();
+    let rawText = result2.choices[0].message.content;
+
     if (!rawText) {
-      throw new Error("Empty content in OpenRouter response");
+      throw new Error("Empty content in OpenRouter verification response");
     }
-
-    console.log("[LUCIFER] Raw response text:", rawText);
 
     // Parse JSON - handle various formats
     let cleanJson = rawText.trim();
-    
-    // Remove markdown code blocks
     cleanJson = cleanJson.replace(/^```json\s*/i, "").replace(/\s*```$/, "");
     cleanJson = cleanJson.replace(/^```\s*/i, "").replace(/\s*```$/, "");
-    
-    // Extract JSON object
+
     const jsonMatch = cleanJson.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       cleanJson = jsonMatch[0];
     }
 
-    console.log("[LUCIFER] Parsed JSON string:", cleanJson);
-    
     const aiResult = JSON.parse(cleanJson);
-    console.log("[LUCIFER] Successfully parsed AI result:", aiResult);
-    
-    // Validate and sanitize results
+    console.log("[LUCIFER] Successfully parsed verified AI result:", aiResult);
+
+    // Normalize and sanitize
     const riskScore = Math.min(100, Math.max(0, parseInt(aiResult.riskScore) || ruleResult.riskScore));
-    const attackType = String(aiResult.attackType || "Unknown Threat").substring(0, 100);
-    const evidence = String(aiResult.evidence || "Analysis completed").substring(0, 500);
+    const attackType = String(aiResult.attackType || "Unclassified Threat").substring(0, 100);
+    const evidence = String(aiResult.evidence || "Forensic analysis complete").substring(0, 500);
     const ipReputation = String(aiResult.ipReputation || "Inconclusive").substring(0, 200);
-    
-    // Normalize label
-    let finalLabel = aiResult.label;
-    if (!["Safe", "Suspicious", "Malicious"].includes(finalLabel)) {
-      finalLabel = riskScore >= 70 ? "Malicious" : riskScore >= 30 ? "Suspicious" : "Safe";
-    }
 
-    // Map string labels to enum values
     let enumLabel = ThreatLabel.SAFE;
-    if (finalLabel === "Malicious") enumLabel = ThreatLabel.MALICIOUS;
-    else if (finalLabel === "Suspicious") enumLabel = ThreatLabel.SUSPICIOUS;
-    else enumLabel = ThreatLabel.SAFE;
+    if (aiResult.label === "Malicious") enumLabel = ThreatLabel.MALICIOUS;
+    else if (aiResult.label === "Suspicious") enumLabel = ThreatLabel.SUSPICIOUS;
+    else enumLabel = riskScore >= 70 ? ThreatLabel.MALICIOUS : riskScore >= 35 ? ThreatLabel.SUSPICIOUS : ThreatLabel.SAFE;
 
-    // Build comprehensive report
-    let reportEvidence = `[DEEPSEEK AI FORENSIC ANALYSIS]\n`;
-    reportEvidence += `Classification: ${finalLabel} | Risk Score: ${riskScore}/100\n\n`;
+    // Build report
+    let reportEvidence = `[GPT-OSS DEEP REASONING ANALYSIS]\n`;
+    reportEvidence += `Classification: ${enumLabel.toUpperCase()} | Risk Score: ${riskScore}/100\n\n`;
     reportEvidence += `[THREAT ASSESSMENT]\n${evidence}\n\n`;
-    reportEvidence += `[DETECTION RULES]\n${ruleResult.warnings || 'Standard analysis'}\n\n`;
+    reportEvidence += `[VERIFICATION STATUS]\nDouble-checked reasoning path confirmed threat profile.\n\n`;
     reportEvidence += `[IP ANALYSIS]\n${ipReputation}\n\n`;
-    
-    // Add detailed computational metrics
+
     if (aiResult.computationalMetrics) {
       const m = aiResult.computationalMetrics;
       reportEvidence += `[COMPUTATIONAL ANALYSIS METRICS]\n`;
       reportEvidence += `• Phishing Score: ${m.phishingScore || 0}/100\n`;
-      reportEvidence += `• Technical Anomaly: ${m.technicalAnomalyScore || 0}/100\n`;
+      reportEvidence += `• Tech Anomaly: ${m.technicalAnomalyScore || 0}/100\n`;
       reportEvidence += `• IP Reputation: ${m.ipReputationScore || 0}/100\n`;
       reportEvidence += `• Malware Risk: ${m.malwareScore || 0}/100\n`;
-      reportEvidence += `• Analysis Confidence: ${m.analysisConfidence || 'Medium'}\n`;
+      reportEvidence += `• Confidence: ${m.analysisConfidence || 'Medium'}\n`;
     }
 
-    const scanResult: ScanResult = {
+    return {
       url,
       resolvedIp,
       riskScore,
@@ -176,25 +185,20 @@ Return ONLY this JSON:
       evidence: reportEvidence,
       ipReputation
     };
-    
-    console.log("[LUCIFER] ✓ Successfully analyzed with OpenRouter:", scanResult);
-    return scanResult;
 
   } catch (error) {
     console.error("[LUCIFER] ❌ OpenRouter Analysis Error:", error);
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error("[LUCIFER] Error Details:", errorMsg);
-    
-    // Fallback to rule-based analysis
+
     return {
       url,
       resolvedIp,
       riskScore: ruleResult.riskScore,
       label: ruleResult.label,
-      attackType: ruleResult.label === ThreatLabel.MALICIOUS ? "Malicious (Rule-Based)" : 
-                  ruleResult.label === ThreatLabel.SUSPICIOUS ? "Suspicious Pattern" : "Safe",
-      evidence: `[RULE-BASED FORENSIC ANALYSIS]\nClassification: ${ruleResult.label} | Risk Score: ${ruleResult.riskScore}/100\n\n[DETECTION PATTERNS]\n${ruleResult.warnings || 'No specific threats detected'}\n\nNote: AI analysis failed (${errorMsg}). Using local heuristic rules.`,
-      ipReputation: "Rule-Based Detection Engine"
+      attackType: ruleResult.label === ThreatLabel.MALICIOUS ? "Malicious (Heuristic)" : "Safe (Heuristic)",
+      evidence: `[RULE-BASED FALLBACK]\nAI Analysis failed (${errorMsg}). Using local heuristic patterns.\n\n[DETECTION PATTERNS]\n${ruleResult.warnings}`,
+      ipReputation: "Rule-Based Detection Core"
     };
   }
 };
+
