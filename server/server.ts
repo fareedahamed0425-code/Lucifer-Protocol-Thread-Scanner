@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import dns from 'dns/promises';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 // Load Environment variables
 dotenv.config({ path: path.join(__dirname, '../.env.local') });
@@ -405,7 +406,12 @@ app.get('/api/report/pdf/:scanId', async (req, res) => {
   // Translate relative screenshot path to local absolute file path
   let absoluteScreenshotPath = '';
   if (scan.screenshotUrl) {
-    absoluteScreenshotPath = path.join(__dirname, 'public/screenshots', path.basename(scan.screenshotUrl));
+    if (isVercel) {
+      const hash = crypto.createHash('md5').update(scan.url).digest('hex');
+      absoluteScreenshotPath = path.join('/tmp', `${hash}.png`);
+    } else {
+      absoluteScreenshotPath = path.join(__dirname, 'public/screenshots', path.basename(scan.screenshotUrl));
+    }
   }
 
   try {
