@@ -8,6 +8,17 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/api': {
+            target: 'http://localhost:5000',
+            changeOrigin: true
+          },
+          '/nvidia-api': {
+            target: 'https://integrate.api.nvidia.com/v1',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/nvidia-api/, '')
+          }
+        }
       },
       plugins: [react()],
       define: {

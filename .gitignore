@@ -11,6 +11,12 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+server/database.json
+server/temp_report_*.pdf
+temp_report_*.pdf
+scratch/
+server/public/screenshots/
 
 # Editor directories and files
 .vscode/*

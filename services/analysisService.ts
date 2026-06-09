@@ -1,7 +1,6 @@
 
 import { storageService } from './storageService';
 import { ThreatLabel, ScanResult, DatasetEntry } from '../types';
-import { analyzeThreatWithAI } from './geminiService';
 
 export const analysisService = {
   // Enhanced IP resolution mocking
@@ -62,8 +61,33 @@ export const analysisService = {
     // 3. Rule-based heuristic weighting
     const ruleResult = analysisService.performRuleAnalysis(url);
     
-    // 4. Deep Forensic AI Analysis
-    return await analyzeThreatWithAI(url, resolvedIp, ruleResult);
+    // 4. Gemini Neural Core - Primary AI Analysis
+    console.log("[LUCIFER] Initiating Gemini Neural Analysis...");
+    
+    try {
+      console.log("[LUCIFER] Attempting Gemini Neural Core...");
+      const { analyzeThreatWithAI } = await import('./geminiService');
+      const result = await analyzeThreatWithAI(url, resolvedIp, ruleResult);
+      if (result.provider === "Gemini 1.5 Flash Core") {
+        console.log("[LUCIFER] Gemini Analysis SUCCESSFUL.");
+        return result;
+      }
+      throw new Error("Gemini Core returned fallback mode.");
+    } catch (aiError) {
+      console.error("[LUCIFER] Gemini Core failed. Reverting to Heuristic Baseline.", aiError);
+      
+      // FALLBACK: LUCIFER HEURISTIC CORE (Offline Rules)
+      return {
+        url,
+        resolvedIp,
+        riskScore: ruleResult.riskScore,
+        label: ruleResult.label,
+        attackType: "Heuristic Baseline",
+        evidence: `[CRITICAL SYSTEM DEGRADATION]\nNeural infrastructure offline. Lucifer Protocol operating in Heuristic Baseline mode.\n\n[DETECTION PATTERNS]\n${ruleResult.warnings}`,
+        ipReputation: "Offline Local Core",
+        provider: "Lucifer Heuristic Core"
+      };
+    }
   },
 
   performRuleAnalysis: (url: string) => {
