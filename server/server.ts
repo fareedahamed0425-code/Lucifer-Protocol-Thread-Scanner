@@ -33,7 +33,10 @@ app.use(express.json());
 app.use('/public/screenshots', express.static(path.join(__dirname, 'public/screenshots')));
 
 // Database File Path
-const DB_PATH = path.join(__dirname, 'database.json');
+const isVercel = !!process.env.VERCEL;
+const DB_PATH = isVercel 
+  ? path.join('/tmp', 'database.json') 
+  : path.join(__dirname, 'database.json');
 
 // Interface definition for DB structure
 interface DBStructure {
@@ -406,7 +409,8 @@ app.get('/api/report/pdf/:scanId', async (req, res) => {
   }
 
   try {
-    const pdfPath = path.join(__dirname, `temp_report_${scanId}.pdf`);
+    const tempDir = isVercel ? '/tmp' : __dirname;
+    const pdfPath = path.join(tempDir, `temp_report_${scanId}.pdf`);
     
     // Generate PDF to temp file
     await reportGenerator.generate({
@@ -487,6 +491,10 @@ app.post('/api/admin/clear', (req, res) => {
   res.json({ message: 'Database history reset successfully' });
 });
 
-app.listen(PORT, () => {
-  console.log(`[LUCIFER PROTOCOL] Threat Intelligence server listening on port ${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`[LUCIFER PROTOCOL] Threat Intelligence server listening on port ${PORT}`);
+  });
+}
+
+export default app;

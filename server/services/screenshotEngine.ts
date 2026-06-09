@@ -3,15 +3,14 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
-// Ensure the screenshots directory exists
-const screenshotsDir = path.join(__dirname, '../public/screenshots');
+const isVercel = !!process.env.VERCEL;
+const screenshotsDir = isVercel 
+  ? '/tmp' 
+  : path.join(__dirname, '../public/screenshots');
+
 if (!fs.existsSync(screenshotsDir)) {
   fs.mkdirSync(screenshotsDir, { recursive: true });
 }
-
-// A beautiful, dark-red base64 encoded PNG placeholder representing a "Cyber threat block / inactive site" mockup
-const THREAT_PLACEHOLDER_PNG = 
-  'iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACpcdYAAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAP+lSURBVHhe7N0H'; // truncated for space, we can use a short valid base64 PNG or a simple SVG
 
 // Let's create a small valid base64 PNG of a red warning box (100x100 pixels) to avoid heavy strings:
 const RED_WARNING_BASE64 = 
@@ -30,8 +29,9 @@ export const screenshotEngine = {
     const thumbFilename = `${hash}_thumb.png`;
     const thumbFilepath = path.join(screenshotsDir, thumbFilename);
 
-    const relativePath = `/public/screenshots/${filename}`;
-    const relativeThumbPath = `/public/screenshots/${thumbFilename}`;
+    const publicUrl = `https://api.microlink.io?url=${encodeURIComponent(urlString)}&screenshot=true&embed=screenshot.url`;
+    const relativePath = isVercel ? publicUrl : `/public/screenshots/${filename}`;
+    const relativeThumbPath = isVercel ? publicUrl : `/public/screenshots/${thumbFilename}`;
 
     try {
       // Clean URL for Microlink (ensure proper protocol encoding)
@@ -54,14 +54,19 @@ export const screenshotEngine = {
     } catch (e) {
       // Fallback: write the warning base64 image if query fails
       const buffer = Buffer.from(RED_WARNING_BASE64, 'base64');
-      fs.writeFileSync(filepath, buffer);
-      fs.writeFileSync(thumbFilepath, buffer);
+      try {
+        fs.writeFileSync(filepath, buffer);
+        fs.writeFileSync(thumbFilepath, buffer);
+      } catch (err) {
+        // Safe fail on read-only system if /tmp is full or has issues
+      }
 
+      const fallbackUrl = `data:image/png;base64,${RED_WARNING_BASE64}`;
       return {
         screenshotPath: filepath,
         thumbnailPath: thumbFilepath,
-        screenshotUrl: relativePath,
-        thumbnailUrl: relativeThumbPath
+        screenshotUrl: isVercel ? fallbackUrl : relativePath,
+        thumbnailUrl: isVercel ? fallbackUrl : relativeThumbPath
       };
     }
   }
