@@ -55,21 +55,26 @@ const initialDb: DBStructure = {
 
 // Helper: Read DB
 const readDb = (): DBStructure => {
-  if (!fs.existsSync(DB_PATH)) {
-    fs.writeFileSync(DB_PATH, JSON.stringify(initialDb, null, 2));
-    return initialDb;
-  }
   try {
+    if (!fs.existsSync(DB_PATH)) {
+      fs.writeFileSync(DB_PATH, JSON.stringify(initialDb, null, 2));
+      return initialDb;
+    }
     const data = fs.readFileSync(DB_PATH, 'utf-8');
     return JSON.parse(data);
   } catch (e) {
+    console.error(`[LUCIFER] DB read/write failed, returning initialDb: ${e}`);
     return initialDb;
   }
 };
 
 // Helper: Write DB
 const writeDb = (data: DBStructure) => {
-  fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
+  } catch (e) {
+    console.error(`[LUCIFER] DB write failed: ${e}`);
+  }
 };
 
 // Helper: Check if IP is private (SSRF Prevention)
@@ -215,29 +220,38 @@ app.post('/api/scan', async (req, res) => {
     // Run Module 1: URL Analyzer (Heuristic checks)
     const urlRes = urlAnalyzer.analyze(targetUrl);
 
-    // Run Network and Web services concurrently for maximum speed (average scan under 5s)
-    const [domainRes, dnsRes, ipRes, sslRes, contentRes] = await Promise.all([
+    // Run Network, Web, Threat feeds, and Screenshot capture concurrently for maximum speed (under 5s)
+    const [domainRes, dnsRes, ipRes, sslRes, contentRes, threatRes, screenshotRes] = await Promise.all([
       whoisService.analyze(domain),
       dnsService.analyze(domain),
       ipService.analyze(domain),
       sslService.analyze(domain),
-      contentAnalyzer.analyze(targetUrl, domain)
+      contentAnalyzer.analyze(targetUrl, domain),
+      threatIntelService.analyze(targetUrl, domain, resolvedIp || '104.28.16.2'),
+      screenshotEngine.capture(targetUrl)
     ]);
 
     const activeIp = ipRes.rawData.ipAddress || resolvedIp || '104.28.16.2';
 
-    // Threat Feeds (VT, AbuseIPDB, PhishTank)
-    const threatRes = await threatIntelService.analyze(targetUrl, domain, activeIp);
+    // Conditionally run Visual Similarity analysis only if brand impersonation is suspected by the markup scan.
+    // This saves ~3s of Gemini API latency for safe or standard sites.
+    let visualRes = {
+      score: 0,
+      findings: [] as string[],
+      rawData: {
+        impersonatedBrand: null as string | null,
+        visualSimilarityScore: 0,
+        details: 'Visual spoofing checks skipped (no brand impersonation indicators detected in page markup).'
+      }
+    };
 
-    // Screenshot Engine (Captures screenshot, stores it, makes thumbnail)
-    const screenshotRes = await screenshotEngine.capture(targetUrl);
-
-    // Visual Similarity analysis using base64 and Gemini Multimodal
-    const visualRes = await visualSimilarity.analyze(
-      screenshotRes.screenshotPath,
-      domain,
-      contentRes.rawData.brandImpersonation?.brand || 'Login Page'
-    );
+    if (contentRes.rawData.brandImpersonation?.detected) {
+      visualRes = await visualSimilarity.analyze(
+        screenshotRes.screenshotPath,
+        domain,
+        contentRes.rawData.brandImpersonation?.brand || 'Login Page'
+      );
+    }
 
     // Final Risk calculations
     const finalRisk = riskEngine.calculate({
