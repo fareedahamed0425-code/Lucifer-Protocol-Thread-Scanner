@@ -1,11 +1,15 @@
 {
   "compilerOptions": {
-    "target": "es2022",
-    "module": "commonjs",
+    "target": "ES2022",
+    "module": "CommonJS",
     "moduleResolution": "node",
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "strict": false,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": false
-  }
+    "resolveJsonModule": true,
+    "rootDir": "../",
+    "outDir": "../dist-api"
+  },
+  "include": ["index.ts", "../server/**/*.ts"]
 }

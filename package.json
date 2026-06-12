@@ -2,7 +2,6 @@
   "name": "bs4:-lucifer-protocol-threat-scanner",
   "private": true,
   "version": "0.0.0",
-  "type": "module",
   "scripts": {
     "dev:frontend": "vite",
     "dev:backend": "npm run dev --prefix server",
@@ -26,6 +25,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/pdfkit": "^0.13.4",
+    "@vercel/node": "^5.8.17",
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^10.0.3",
     "typescript": "~5.8.2",

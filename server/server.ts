@@ -7,8 +7,12 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 
 // Load Environment variables
-dotenv.config({ path: path.join(__dirname, '../.env.local') });
-dotenv.config();
+// On Vercel, env vars are injected by the platform directly into process.env.
+// The path-based .env.local load is only used for local development.
+if (!process.env.VERCEL) {
+  dotenv.config({ path: path.join(__dirname, '../.env.local') });
+}
+dotenv.config(); // load server/.env as fallback for local dev
 
 // Import Services
 import { urlAnalyzer } from './services/urlAnalyzer';
