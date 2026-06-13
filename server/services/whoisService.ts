@@ -67,7 +67,17 @@ export const whoisService = {
     } catch (e: any) {
       // Fallback: Generate mock/realistic WHOIS data if offline or RDAP fails
       // We check for some common suspicious domains to return suspicious metrics
-      const isTestSuspicious = domain.includes('secure') || domain.includes('login') || domain.includes('bank') || domain.includes('phish');
+      const suspiciousKeywords = [
+        'secure', 'login', 'bank', 'phish', 'verify', 'verification', 'account',
+        'update', 'confirm', 'wallet', 'paypal', 'amazon', 'netflix', 'apple',
+        'google', 'facebook', 'security', 'billing', 'support', 'signin',
+        'password', 'credential', 'suspended', 'urgent', 'free', 'prize'
+      ];
+      const suspiciousTLDs = ['.xyz', '.tk', '.ml', '.cf', '.ga', '.gq', '.ru', '.cn', '.top', '.click', '.download', '.loan', '.win'];
+      const domainLower = domain.toLowerCase();
+      const keywordHit = suspiciousKeywords.some(k => domainLower.includes(k));
+      const hasBadTLD = suspiciousTLDs.some(tld => domainLower.endsWith(tld));
+      const isTestSuspicious = keywordHit || hasBadTLD;
       
       const now = new Date();
       let created = new Date();

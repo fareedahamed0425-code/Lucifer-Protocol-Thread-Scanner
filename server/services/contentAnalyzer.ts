@@ -56,13 +56,28 @@ export const contentAnalyzer = {
       });
       html = response.data;
     } catch (e: any) {
-      // Graceful fallback: If it's a suspicious test domain, simulate a login page structure
-      const isTestPhish = domain.includes('secure') || domain.includes('login') || domain.includes('bank') || domain.includes('phish');
+      // Graceful fallback: If it's a suspicious domain, simulate a login page structure
+      const suspiciousKeywords = [
+        'secure', 'login', 'bank', 'phish', 'verify', 'verification', 'account',
+        'update', 'confirm', 'wallet', 'paypal', 'amazon', 'netflix', 'apple',
+        'google', 'facebook', 'security', 'billing', 'support', 'signin',
+        'password', 'credential', 'suspended', 'urgent'
+      ];
+      const suspiciousTLDs = ['.xyz', '.tk', '.ml', '.cf', '.ga', '.gq', '.ru', '.cn', '.top', '.click', '.download', '.loan', '.win'];
+      const domainLower = domain.toLowerCase();
+      const urlLower = urlString.toLowerCase();
+      const keywordHits = suspiciousKeywords.filter(k => urlLower.includes(k) || domainLower.includes(k)).length;
+      const hasBadTLD = suspiciousTLDs.some(tld => domainLower.includes(tld));
+      const isTestPhish = keywordHits >= 1 || hasBadTLD;
+
       if (isTestPhish) {
         let mockedBrand = 'Microsoft';
-        if (domain.includes('google')) mockedBrand = 'Google';
-        else if (domain.includes('paypal')) mockedBrand = 'PayPal';
-        else if (domain.includes('netflix')) mockedBrand = 'Netflix';
+        if (domainLower.includes('google') || urlLower.includes('google')) mockedBrand = 'Google';
+        else if (domainLower.includes('paypal') || urlLower.includes('paypal')) mockedBrand = 'PayPal';
+        else if (domainLower.includes('netflix') || urlLower.includes('netflix')) mockedBrand = 'Netflix';
+        else if (domainLower.includes('amazon') || urlLower.includes('amazon')) mockedBrand = 'Amazon';
+        else if (domainLower.includes('apple') || urlLower.includes('apple')) mockedBrand = 'Apple';
+        else if (domainLower.includes('facebook') || urlLower.includes('facebook')) mockedBrand = 'Facebook';
 
         html = `
           <html>

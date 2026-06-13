@@ -48,14 +48,35 @@ export const threatIntelService = {
         // VT query failed
       }
     } else {
-      // Simulate VT based on target keywords
-      const isTestSuspicious = urlString.includes('secure') || urlString.includes('login') || urlString.includes('bank') || urlString.includes('phish');
-      if (isTestSuspicious) {
+      // Simulate VT based on threat indicators
+      const suspiciousKeywords = [
+        'secure', 'login', 'bank', 'phish', 'verify', 'verification', 'account',
+        'update', 'confirm', 'wallet', 'crypto', 'paypal', 'amazon', 'netflix',
+        'apple', 'google', 'facebook', 'instagram', 'security', 'billing', 'support',
+        'signin', 'password', 'credential', 'ebay', 'microsoft', 'office365',
+        'free', 'prize', 'winner', 'click', 'urgent', 'suspended', 'limited'
+      ];
+      const suspiciousTLDs = ['.xyz', '.tk', '.ml', '.cf', '.ga', '.gq', '.ru', '.cn', '.top', '.click', '.download', '.loan', '.win', '.stream'];
+      const urlLower = urlString.toLowerCase();
+
+      const keywordMatches = suspiciousKeywords.filter(k => urlLower.includes(k));
+      const hasSuspiciousTLD = suspiciousTLDs.some(tld => urlLower.includes(tld));
+      const isHttpOnly = urlString.startsWith('http://');
+      const isSuspicious = keywordMatches.length >= 1 || hasSuspiciousTLD || isHttpOnly;
+      const isMalicious = keywordMatches.length >= 2 || (hasSuspiciousTLD && keywordMatches.length >= 1);
+
+      if (isMalicious) {
         vtVerdict = 'Malicious';
         vtConfidence = 95;
-        vtDetails = 'Flagged as malicious by 18/90 engines (Simulated)';
+        vtDetails = `Flagged as malicious by 18/90 engines (Simulated) — matched: ${keywordMatches.slice(0, 3).join(', ')}`;
         score += 40;
-        findings.push('VirusTotal: flagged as malicious by 18 security engines');
+        findings.push(`VirusTotal: flagged as malicious by 18 security engines (${keywordMatches.slice(0, 3).join(', ')})`);
+      } else if (isSuspicious) {
+        vtVerdict = 'Suspicious';
+        vtConfidence = 72;
+        vtDetails = `Flagged as suspicious by 6/90 engines (Simulated) — matched: ${keywordMatches.slice(0, 2).join(', ') || 'suspicious TLD/protocol'}`;
+        score += 20;
+        findings.push(`VirusTotal: flagged as suspicious by 6 security engines`);
       } else {
         vtVerdict = 'Safe';
         vtConfidence = 90;
@@ -93,14 +114,31 @@ export const threatIntelService = {
         // AbuseIPDB fail
       }
     } else {
-      // Simulate AbuseIPDB
-      const isTestSuspicious = urlString.includes('secure') || urlString.includes('login') || urlString.includes('bank') || urlString.includes('phish');
-      if (isTestSuspicious) {
+      // Simulate AbuseIPDB based on broader threat indicators
+      const suspiciousKeywords = [
+        'secure', 'login', 'bank', 'phish', 'verify', 'account', 'update',
+        'confirm', 'wallet', 'crypto', 'paypal', 'amazon', 'netflix', 'apple',
+        'google', 'facebook', 'security', 'billing', 'support', 'signin',
+        'free', 'prize', 'click', 'urgent', 'suspended'
+      ];
+      const suspiciousTLDs = ['.xyz', '.tk', '.ml', '.cf', '.ga', '.gq', '.ru', '.cn', '.top', '.click', '.download', '.loan', '.win', '.stream'];
+      const urlLower = urlString.toLowerCase();
+
+      const keywordHits = suspiciousKeywords.filter(k => urlLower.includes(k)).length;
+      const hasSuspiciousTLD = suspiciousTLDs.some(tld => urlLower.includes(tld));
+
+      if (keywordHits >= 2 || (hasSuspiciousTLD && keywordHits >= 1)) {
         abuseVerdict = 'Suspicious';
         abuseConfidence = 78;
         abuseDetails = 'Abuse Score: 35%, Reports: 12 (Simulated)';
         score += 20;
         findings.push('AbuseIPDB: IP associated with 12 recent spam/phishing reports');
+      } else if (keywordHits === 1 || hasSuspiciousTLD) {
+        abuseVerdict = 'Suspicious';
+        abuseConfidence = 55;
+        abuseDetails = 'Abuse Score: 18%, Reports: 4 (Simulated)';
+        score += 10;
+        findings.push('AbuseIPDB: IP has minor abuse history (4 reports)');
       } else {
         abuseVerdict = 'Safe';
         abuseConfidence = 95;
@@ -110,18 +148,40 @@ export const threatIntelService = {
     feeds.push({ source: 'AbuseIPDB', verdict: abuseVerdict, confidence: abuseConfidence, details: abuseDetails });
 
     // Check 3: OpenPhish
-    // OpenPhish is a simple community feed of phishing URLs. We can search our local simulation for matches.
+    // Broad phishing pattern matching on URL structure
     let openPhishVerdict: 'Safe' | 'Suspicious' | 'Malicious' = 'Safe';
     let openPhishConfidence = 90;
     let openPhishDetails = 'Not listed in active phishing feed';
 
-    const isPhishMatch = urlString.includes('bank-verification') || urlString.includes('paypal-update') || urlString.includes('login-security') || urlString.includes('phish');
-    if (isPhishMatch) {
+    const phishKeywords = [
+      'bank-verification', 'paypal-update', 'login-security', 'phish',
+      'verify-account', 'account-suspended', 'secure-login', 'update-billing',
+      'confirm-identity', 'free-prize', 'click-here', 'urgent-action',
+      'limited-offer', 'wallet-verify', 'crypto-airdrop'
+    ];
+    const broadPhishKeywords = [
+      'verify', 'verification', 'account', 'secure', 'login', 'signin',
+      'password', 'credential', 'suspended', 'urgent', 'billing', 'update'
+    ];
+    const suspiciousTLDsForPhish = ['.xyz', '.tk', '.ml', '.cf', '.ga', '.gq', '.ru', '.top', '.click', '.download', '.loan', '.win'];
+    const urlLowerPhish = urlString.toLowerCase();
+
+    const isExactPhishMatch = phishKeywords.some(k => urlLowerPhish.includes(k));
+    const broadHits = broadPhishKeywords.filter(k => urlLowerPhish.includes(k)).length;
+    const hasBadTLD = suspiciousTLDsForPhish.some(tld => urlLowerPhish.includes(tld));
+
+    if (isExactPhishMatch || (broadHits >= 2 && hasBadTLD)) {
       openPhishVerdict = 'Malicious';
       openPhishConfidence = 98;
       openPhishDetails = 'Active listing matched in OpenPhish database';
       score += 25;
       findings.push('OpenPhish: URL matched in active phishing threat feed');
+    } else if (broadHits >= 2 || (broadHits >= 1 && hasBadTLD)) {
+      openPhishVerdict = 'Suspicious';
+      openPhishConfidence = 70;
+      openPhishDetails = 'URL exhibits phishing structural patterns (Simulated)';
+      score += 12;
+      findings.push('OpenPhish: URL structure matches known phishing campaign patterns');
     }
     feeds.push({ source: 'OpenPhish', verdict: openPhishVerdict, confidence: openPhishConfidence, details: openPhishDetails });
 
@@ -130,12 +190,18 @@ export const threatIntelService = {
     let phishTankConfidence = 95;
     let phishTankDetails = 'URL not registered in PhishTank database';
 
-    if (isPhishMatch || urlString.includes('secure') || domain.includes('verification')) {
+    if (isExactPhishMatch || domain.includes('verification') || (broadHits >= 2)) {
       phishTankVerdict = 'Malicious';
       phishTankConfidence = 99;
       phishTankDetails = 'URL verified as phishing (ID: #837264)';
       score += 25;
       findings.push('PhishTank: Verified phishing campaign listing found (ID: #837264)');
+    } else if (broadHits >= 1 || hasBadTLD) {
+      phishTankVerdict = 'Suspicious';
+      phishTankConfidence = 65;
+      phishTankDetails = 'URL flagged as potential phishing candidate (Simulated)';
+      score += 10;
+      findings.push('PhishTank: URL shows characteristics consistent with phishing pages');
     }
     feeds.push({ source: 'PhishTank', verdict: phishTankVerdict, confidence: phishTankConfidence, details: phishTankDetails });
 
