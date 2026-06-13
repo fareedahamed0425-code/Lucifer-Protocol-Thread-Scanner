@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { UserRole, AppState } from './types';
 import { storageService } from './services/storageService';
 import Navbar from './components/Navbar';
-import AdminPanel from './components/AdminPanel';
 import UserPanel from './components/UserPanel';
 import Dashboard from './components/Dashboard';
 import HistoryPanel from './components/HistoryPanel';
@@ -11,13 +10,13 @@ import { ARCHITECTURE_NOTE } from './constants';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(storageService.getState());
-  const [view, setView] = useState<'LOGIN' | 'DASHBOARD' | 'SCANNER' | 'HISTORY' | 'ADMIN'>('LOGIN');
+  const [view, setView] = useState<'LOGIN' | 'DASHBOARD' | 'SCANNER' | 'HISTORY'>('LOGIN');
   const [activeScan, setActiveScan] = useState<ScanResult | null>(null);
 
   useEffect(() => {
     console.log(ARCHITECTURE_NOTE);
     if (state.isLoggedIn) {
-      setView(state.role === UserRole.ADMIN ? 'ADMIN' : 'DASHBOARD');
+      setView('DASHBOARD');
     }
   }, [state.isLoggedIn, state.role]);
 
@@ -25,7 +24,7 @@ const App: React.FC = () => {
     const newState = { ...state, role, isLoggedIn: true };
     setState(newState);
     storageService.saveState(newState);
-    setView(role === UserRole.ADMIN ? 'ADMIN' : 'DASHBOARD');
+    setView('DASHBOARD');
   };
 
   const handleLogout = () => {
@@ -46,7 +45,7 @@ const App: React.FC = () => {
         role={state.role} 
         currentView={view}
         onLogout={handleLogout} 
-        onNav={(v) => setView(v)} 
+        onNav={(v) => setView(v as any)} 
       />
       
       <main className="flex-1 pb-16">
@@ -67,9 +66,7 @@ const App: React.FC = () => {
           }} />
         )}
 
-        {view === 'ADMIN' && state.role === UserRole.ADMIN && (
-          <AdminPanel state={state} refresh={refreshState} />
-        )}
+
       </main>
 
       <footer className="border-t border-slate-900/60 py-6 px-6 text-center bg-slate-950/20">

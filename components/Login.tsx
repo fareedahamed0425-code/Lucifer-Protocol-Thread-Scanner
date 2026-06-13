@@ -38,23 +38,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         <div className="space-y-4 relative z-10">
           <button 
-            onClick={(e) => handleSubmit(e, UserRole.ADMIN)}
-            className="group w-full bg-slate-900/80 hover:bg-slate-800 text-white font-bold py-4 rounded-xl transition border border-slate-800 flex items-center justify-center gap-3"
-          >
-            <svg className="w-5 h-5 text-red-600 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M2.166 4.9L10 .155 17.834 4.9a2 2 0 011.166 1.81v3.289c0 5.518-3.565 10.155-8.5 11.5-4.935-1.345-8.5-5.982-8.5-11.5V6.71a2 2 0 011.166-1.81zm9.117 6.19a3.501 3.501 0 11-2.566-2.567 3.5 3.5 0 012.566 2.567z" clipRule="evenodd" />
-            </svg>
-            <span className="tracking-widest uppercase text-xs">Admin Access</span>
-          </button>
-          
-          <button 
             onClick={(e) => handleSubmit(e, UserRole.USER)}
             className="group w-full bg-red-600 hover:bg-red-500 text-white font-black py-4 rounded-xl transition shadow-lg shadow-red-900/40 flex items-center justify-center gap-3 active:scale-[0.98]"
           >
             <svg className="w-5 h-5 group-hover:rotate-12 transition-transform" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
             </svg>
-            <span className="tracking-widest uppercase text-xs">Standard Entry</span>
+            <span className="tracking-widest uppercase text-xs">Enter Platform</span>
           </button>
         </div>
 
