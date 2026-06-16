@@ -53,7 +53,7 @@ interface DBStructure {
 // Initial DB template
 const initialDb: DBStructure = {
   scans: [],
-  allowlist: ['google.com', 'microsoft.com', 'github.com', 'paypal.com'],
+  allowlist: ['google.com', 'microsoft.com', 'paypal.com'],
   blocklist: ['phish-login-alert.xyz', 'paypal-secure-update.ru', '127.0.0.1']
 };
 
