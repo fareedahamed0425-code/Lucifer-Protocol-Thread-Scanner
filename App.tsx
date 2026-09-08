@@ -95,7 +95,7 @@ const App: React.FC = () => {
             </a>
 
             <a 
-              href="https://bafareedahamedportfoilo.vercel.app/" 
+              href="https://bafareedahamedportfolio.vercel.app/" 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center justify-center gap-3 px-6 py-3 bg-slate-900/50 hover:bg-slate-800/80 border border-slate-700/50 rounded-xl transition-all duration-300 group hover:shadow-[0_0_15px_rgba(59,130,246,0.15)] hover:-translate-y-0.5"
